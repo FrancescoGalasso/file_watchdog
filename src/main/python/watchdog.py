@@ -24,7 +24,6 @@ class MainWindow(QMainWindow):  # pylint: disable=too-few-public-methods
         uic.loadUi(self.ui_path, self)
 
         logging.warning('config: {}'.format(self.config))
-        logging.warning('self.ctx: {}'.format(self.ctx))
 
 
 class WatchdogApplication(QApplication):
@@ -58,7 +57,7 @@ class WatchdogApplication(QApplication):
                     "folder_path": "",
                     "api_endpoint": ""
                 }
-                json.dump(data, config_file)
+                json.dump(data, config_file, indent=4)
 
         finally:
             with open(filename_cfg, 'r') as f_alias:
