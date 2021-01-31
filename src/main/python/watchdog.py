@@ -9,6 +9,7 @@ import logging
 import json
 import os
 import asyncio
+import sys
 
 from PyQt5 import uic
 from PyQt5.QtWidgets import QMainWindow, QApplication
@@ -44,7 +45,7 @@ class WatchdogApplication(QApplication):
         self.__tasks = []
         self.__runners = []
         self.__config = self.__get_config(fbs_ctx)
-        self.__init_event_loop()
+        self.__async_qt_event_loop = self.__init_async_event_loop()
         self.__init_tasks()
 
         # Instantiating MainWindow passed as 'main_windows_class'
@@ -77,9 +78,10 @@ class WatchdogApplication(QApplication):
             logging.warning('json_data: {}'.format(json_data))
             return json_data        # pylint: disable=lost-exception
 
-    def __init_event_loop(self):
-        loop = QEventLoop(self)
-        asyncio.set_event_loop(loop)
+    def __init_async_event_loop(self):
+        qt_event_loop = QEventLoop(self)
+        asyncio.set_event_loop(qt_event_loop)
+        return qt_event_loop
 
     def __init_tasks(self):
 
@@ -150,3 +152,5 @@ class WatchdogApplication(QApplication):
             self.loop.shutdown_asyncgens()
         )
         self.loop.close()
+
+        sys.exit(self.__async_qt_event_loop)
