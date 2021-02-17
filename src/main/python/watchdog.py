@@ -2,6 +2,8 @@
 
 # pylint: disable=no-name-in-module
 # pylint: disable=logging-format-interpolation
+# pylint: disable=logging-fstring-interpolation
+# pylint: disable=missing-function-docstring
 
 """ Main module """
 
@@ -11,25 +13,34 @@ import os
 import asyncio
 import sys
 import re
+import datetime
+import time
+import traceback
 
 from PyQt5 import uic
-from PyQt5.QtWidgets import QMainWindow, QApplication
+from PyQt5.QtWidgets import QMainWindow, QApplication, QFileDialog
 from PyQt5.QtGui import QIcon, QPixmap
 from PyQt5.QtCore import Qt
 from qasync import QEventLoop
 
+sys.path.append('.')
+from file_watchdog_exceptions import (MissingIP,
+                                      MissingFolderPath,
+                                      EmptyArguments)
+sys.path.remove('.')
+
+
+WATCHDOG_CFG_FILE_NAME = 'watchdog.cfg'
+CACHE = {}
 
 class MainWindow(QMainWindow):  # pylint: disable=too-few-public-methods
     """ Main Window """
 
-    def __init__(self, ctx, config):
+    def __init__(self, ctx):
         super(MainWindow, self).__init__()  # pylint: disable=super-with-arguments
         self.ctx = ctx
-        self.config = config
         self.ui_path = self.ctx.get_resource('main_window.ui')
         uic.loadUi(self.ui_path, self)
-
-        logging.warning('config: {}'.format(self.config))
 
         gray = self.ctx.get_resource('images\\gray.png')
         pixmap_gray = QPixmap(gray).scaled(30, 30, Qt.KeepAspectRatio, Qt.SmoothTransformation)
@@ -38,6 +49,21 @@ class MainWindow(QMainWindow):  # pylint: disable=too-few-public-methods
 
         self.btn_home.clicked.connect(self.on_btn_home_clicked)
         self.btn_cfg.clicked.connect(self.on_btn_config_clicked)
+        self.btn_open_folder_files.clicked.connect(self.__get_folder_path)
+        self.btn_save_cfg.clicked.connect(self.__save_cfg)
+
+
+    def handle_exception(self, err, timestamp, ui_msg=None):  # pylint:  disable=no-self-use
+
+        if not ui_msg:
+            if hasattr(err, 'message'):
+                ui_msg = err.message
+            else:
+                ui_msg = err
+
+        logging.critical(f'err: {ui_msg}')
+        excp_message_board = f'[{timestamp}] {ui_msg}\n'
+        self.msg_board.insertPlainText(excp_message_board)
 
     def on_btn_home_clicked(self):
         self.main_window_stack.setCurrentWidget(self.home)
@@ -46,7 +72,7 @@ class MainWindow(QMainWindow):  # pylint: disable=too-few-public-methods
         self.main_window_stack.setCurrentWidget(self.config)
 
     def update_gui_ip_infos(self, valid_ip, reachable_ip):
-        logging.warning('called update_gui_ip_infos')
+
         red = self.ctx.get_resource('images\\red.png')
         green = self.ctx.get_resource('images\\green.png')
         pixmap_red = QPixmap(red).scaled(30, 30, Qt.KeepAspectRatio, Qt.SmoothTransformation)
@@ -56,11 +82,50 @@ class MainWindow(QMainWindow):  # pylint: disable=too-few-public-methods
             self.img_valid_ip.setPixmap(pixmap_green)
         elif valid_ip is False:
             self.img_valid_ip.setPixmap(pixmap_red)
-        
+
         if reachable_ip is True:
             self.img_reach_lbl.setPixmap(pixmap_green)
         elif reachable_ip is False:
             self.img_reach_lbl.setPixmap(pixmap_red)
+
+    def __get_folder_path(self):
+        foo_dir = QFileDialog.getExistingDirectory(self, 'Select a directory')
+        self.qline_folder_path.setText(foo_dir)
+
+    def __save_cfg(self):
+        folder_pth = self.qline_folder_path.text()
+        ip = self.qline_ip.text()
+        formatted_date = datetime.datetime.fromtimestamp(time.time()).strftime('%d %b %y %H:%M:%S')
+
+        try:
+
+            if ip.rstrip() == "" and folder_pth == "" :
+                raise EmptyArguments('PLEASE FILL EMPTY IP FIELD AND SELECT A FOLDER')
+
+            elif ip.rstrip() == "":
+                raise MissingIP('PLEASE FILL EMPTY IP FIELD')
+
+            elif folder_pth == "":
+                raise MissingFolderPath('PLEASE SELECT A FOLDER')
+
+            else:
+
+                try:
+                    logging.debug(f'config: {self.config}')
+                    with open(self.ctx.get_resource(WATCHDOG_CFG_FILE_NAME), 'w') as f_alias:
+                        if CACHE.get('config'):
+                            old_config = CACHE.get('config')
+                            old_config.update({'ip': ip})
+                            old_config.update({'folder_path': folder_pth})
+                        json.dump(old_config, f_alias, indent=2)
+                        save_msg = f'[{formatted_date}] NEW CONFIG SAVED'
+                        self.msg_board.insertPlainText(save_msg)
+
+                except BaseException:   # pylint: disable=broad-except
+                    print(traceback.format_exc())
+
+        except (EmptyArguments, MissingIP, MissingFolderPath) as excp:
+            self.handle_exception(excp, formatted_date)
 
 
 class WatchdogApplication(QApplication):
@@ -78,13 +143,13 @@ class WatchdogApplication(QApplication):
         self.__init_tasks()
 
         # Instantiating MainWindow passed as 'main_windows_class'
-        self.main_window = main_window_class(fbs_ctx, self.__config)
+        self.main_window = main_window_class(fbs_ctx)
 
         logging.warning('self: {}'.format(self))
 
         self.run_forever()
 
-    def __get_config(self, fbs_ctx, cfg_filename='watchdog.cfg'):       # pylint: disable=no-self-use
+    def __get_config(self, fbs_ctx, cfg_filename=WATCHDOG_CFG_FILE_NAME):       # pylint: disable=no-self-use
         try:
             filename_cfg = fbs_ctx.get_resource(cfg_filename)
             logging.warning('filename_cfg: {}'.format({filename_cfg}))
@@ -105,6 +170,8 @@ class WatchdogApplication(QApplication):
                 json_data = json.loads(f_alias.read())
 
             logging.warning('json_data: {}'.format(json_data))
+
+            CACHE.update({'config': json_data})
             return json_data        # pylint: disable=lost-exception
 
     def __init_async_event_loop(self):
@@ -158,7 +225,7 @@ class WatchdogApplication(QApplication):
 
         while True:
             random_value = randint(100, 200)
-            logging.warning(f'[file watchdog task] - random number: {random_value}')
+            # logging.warning(f'[file watchdog task] - random number: {random_value}')
             await asyncio.sleep(sleep_time)
             # for (dirpath, dirnames, filenames) in os.walk(path_to_dir):
 
@@ -170,8 +237,8 @@ class WatchdogApplication(QApplication):
             alfa_device_ip = self.__config.get('ip')
 
             # check if IP has a valid syntax
-            regex = "^((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$"
-            if(re.search(regex, alfa_device_ip)): 
+            regex = "^((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\\.){3}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$"
+            if re.search(regex, alfa_device_ip): 
                 _valid_ip = True
 
             # check if IP is reachable if _valid_ip is True
@@ -179,7 +246,7 @@ class WatchdogApplication(QApplication):
                 cmd_ = f"ping -n 1 -w 1000 {alfa_device_ip}"
                 ping_process = await asyncio.create_subprocess_shell(cmd_, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
                 status = await ping_process.wait()
-                logging.warning(f'status: {status}')
+                logging.debug(f'status: {status}')
                 if status == 0:
                     _reachable_ip = True
 
