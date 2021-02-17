@@ -56,7 +56,7 @@ class MainWindow(QMainWindow):  # pylint: disable=too-few-public-methods
         self.__load_cfg()
 
 
-    def handle_exception(self, err, timestamp, ui_msg=None):  # pylint:  disable=no-self-use
+    def handle_exception(self, err, ui_msg=None):  # pylint:  disable=no-self-use
 
         if not ui_msg:
             if hasattr(err, 'message'):
@@ -65,8 +65,7 @@ class MainWindow(QMainWindow):  # pylint: disable=too-few-public-methods
                 ui_msg = err
 
         logging.critical(f'err: {ui_msg}')
-        excp_message_board = f'[{timestamp}] {ui_msg}\n'
-        self.msg_board.insertPlainText(excp_message_board)
+        self.update_gui_msg_board(ui_msg)
 
     def on_btn_home_clicked(self):
         self.main_window_stack.setCurrentWidget(self.home)
@@ -91,6 +90,11 @@ class MainWindow(QMainWindow):  # pylint: disable=too-few-public-methods
         elif reachable_ip is False:
             self.img_reach_lbl.setPixmap(pixmap_red)
 
+    def update_gui_msg_board(self, msg):
+        formatted_date = datetime.datetime.fromtimestamp(time.time()).strftime('%d %b %y %H:%M:%S')
+        msg = f'[{formatted_date}] {msg}\n'
+        self.msg_board.insertPlainText(msg)
+
     def __get_folder_path(self):
         foo_dir = QFileDialog.getExistingDirectory(self, 'Select a directory')
         self.qline_folder_path.setText(foo_dir)
@@ -98,7 +102,6 @@ class MainWindow(QMainWindow):  # pylint: disable=too-few-public-methods
     def __save_cfg(self):
         folder_pth = self.qline_folder_path.text()
         ip = self.qline_ip.text()
-        formatted_date = datetime.datetime.fromtimestamp(time.time()).strftime('%d %b %y %H:%M:%S')
 
         try:
 
@@ -121,14 +124,14 @@ class MainWindow(QMainWindow):  # pylint: disable=too-few-public-methods
                             old_config.update({'ip': ip})
                             old_config.update({'folder_path': folder_pth})
                         json.dump(old_config, f_alias, indent=2)
-                        save_msg = f'[{formatted_date}] NEW CONFIG SAVED'
-                        self.msg_board.insertPlainText(save_msg)
+                        save_msg = 'NEW CONFIG SAVED'
+                        self.update_gui_msg_board(save_msg)
 
                 except BaseException:   # pylint: disable=broad-except
                     print(traceback.format_exc())
 
         except (EmptyArguments, MissingIP, MissingFolderPath) as excp:
-            self.handle_exception(excp, formatted_date)
+            self.handle_exception(excp)
 
     def __load_cfg(self):
         if CACHE.get('config'):
@@ -240,13 +243,15 @@ class WatchdogApplication(QApplication):
             logging.critical(e)
 
     async def __file_watchdog_task(self, sleep_time=5):
-        from random import randint
+
+        watchdog_folder_path = self.__config.get('folder_path')
 
         while True:
-            random_value = randint(100, 200)
-            # logging.warning(f'[file watchdog task] - random number: {random_value}')
+
+            # for (dirpath, dirnames, filenames) in os.walk(watchdog_folder_path):
+            #     tmp_lista += [os.path.join(dirpath, file) for file in filenames if '.bak' not in file]
+
             await asyncio.sleep(sleep_time)
-            # for (dirpath, dirnames, filenames) in os.walk(path_to_dir):
 
     async def __ip_watchdog_task(self, sleep_time=5):
         _valid_ip = False
@@ -257,7 +262,7 @@ class WatchdogApplication(QApplication):
 
             # check if IP has a valid syntax
             regex = "^((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\\.){3}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$"
-            if re.search(regex, alfa_device_ip): 
+            if re.search(regex, alfa_device_ip):
                 _valid_ip = True
 
             # check if IP is reachable if _valid_ip is True
