@@ -31,10 +31,10 @@ class MainWindow(QMainWindow):  # pylint: disable=too-few-public-methods
 
         logging.warning('config: {}'.format(self.config))
 
-        red = self.ctx.get_resource('images\\red.png')
-        pixmap_red = QPixmap(red).scaled(30, 30, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-        self.img_reach_lbl.setPixmap(pixmap_red)
-        self.img_valid_ip.setPixmap(pixmap_red)
+        gray = self.ctx.get_resource('images\\gray.png')
+        pixmap_gray = QPixmap(gray).scaled(30, 30, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        self.img_reach_lbl.setPixmap(pixmap_gray)
+        self.img_valid_ip.setPixmap(pixmap_gray)
 
         self.btn_home.clicked.connect(self.on_btn_home_clicked)
         self.btn_cfg.clicked.connect(self.on_btn_config_clicked)
