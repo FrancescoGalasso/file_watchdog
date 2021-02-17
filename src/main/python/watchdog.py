@@ -16,6 +16,7 @@ import re
 import datetime
 import time
 import traceback
+import requests
 
 from PyQt5 import uic
 from PyQt5.QtWidgets import QMainWindow, QApplication, QFileDialog
@@ -272,7 +273,6 @@ class WatchdogApplication(QApplication):
 
             self.main_window.update_gui_ip_infos(valid_ip=_valid_ip, reachable_ip=_reachable_ip)
             await asyncio.sleep(sleep_time)
-
 
     def run_forever(self):
 
