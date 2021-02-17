@@ -32,9 +32,7 @@ class MainWindow(QMainWindow):  # pylint: disable=too-few-public-methods
         logging.warning('config: {}'.format(self.config))
 
         red = self.ctx.get_resource('images\\red.png')
-        pixmap_red = QPixmap(red).scaled(30, 30, Qt.KeepAspectRatio,
-                                              Qt.SmoothTransformation)
-        logging.warning(f'red: {red}')
+        pixmap_red = QPixmap(red).scaled(30, 30, Qt.KeepAspectRatio, Qt.SmoothTransformation)
         self.img_reach_lbl.setPixmap(pixmap_red)
         self.img_valid_ip.setPixmap(pixmap_red)
 
