@@ -10,9 +10,12 @@ import json
 import os
 import asyncio
 import sys
+import re
 
 from PyQt5 import uic
 from PyQt5.QtWidgets import QMainWindow, QApplication
+from PyQt5.QtGui import QIcon, QPixmap
+from PyQt5.QtCore import Qt
 from qasync import QEventLoop
 
 
@@ -28,10 +31,38 @@ class MainWindow(QMainWindow):  # pylint: disable=too-few-public-methods
 
         logging.warning('config: {}'.format(self.config))
 
-        self.pushButton.clicked.connect(lambda: self.test_func())
+        red = self.ctx.get_resource('images\\red.png')
+        pixmap_red = QPixmap(red).scaled(30, 30, Qt.KeepAspectRatio,
+                                              Qt.SmoothTransformation)
+        logging.warning(f'red: {red}')
+        self.img_reach_lbl.setPixmap(pixmap_red)
+        self.img_valid_ip.setPixmap(pixmap_red)
 
-    def test_func(self):
-        logging.warning('pushButton Clicked !')
+        self.btn_home.clicked.connect(self.on_btn_home_clicked)
+        self.btn_cfg.clicked.connect(self.on_btn_config_clicked)
+
+    def on_btn_home_clicked(self):
+        self.main_window_stack.setCurrentWidget(self.home)
+
+    def on_btn_config_clicked(self):
+        self.main_window_stack.setCurrentWidget(self.config)
+
+    def update_gui_ip_infos(self, valid_ip, reachable_ip):
+        logging.warning('called update_gui_ip_infos')
+        red = self.ctx.get_resource('images\\red.png')
+        green = self.ctx.get_resource('images\\green.png')
+        pixmap_red = QPixmap(red).scaled(30, 30, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        pixmap_green = QPixmap(green).scaled(30, 30, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+
+        if valid_ip is True:
+            self.img_valid_ip.setPixmap(pixmap_green)
+        elif valid_ip is False:
+            self.img_valid_ip.setPixmap(pixmap_red)
+        
+        if reachable_ip is True:
+            self.img_reach_lbl.setPixmap(pixmap_green)
+        elif reachable_ip is False:
+            self.img_reach_lbl.setPixmap(pixmap_red)
 
 
 class WatchdogApplication(QApplication):
@@ -89,6 +120,9 @@ class WatchdogApplication(QApplication):
         file_watchdog_task = self.__file_watchdog_task(5)
         self.__tasks.append(file_watchdog_task)
 
+        ip_watchdog_task = self.__ip_watchdog_task(5)
+        self.__tasks.append(ip_watchdog_task)
+
     def __close_tasks(self):
         logging.warning('close all tasks')
 
@@ -125,6 +159,32 @@ class WatchdogApplication(QApplication):
             random_value = randint(100, 200)
             logging.warning(f'[file watchdog task] - random number: {random_value}')
             await asyncio.sleep(sleep_time)
+            # for (dirpath, dirnames, filenames) in os.walk(path_to_dir):
+
+    async def __ip_watchdog_task(self, sleep_time=5):
+        _valid_ip = False
+        _reachable_ip = False
+
+        while True:
+            alfa_device_ip = self.__config.get('ip')
+
+            # check if IP has a valid syntax
+            regex = "^((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$"
+            if(re.search(regex, alfa_device_ip)): 
+                _valid_ip = True
+
+            # check if IP is reachable if _valid_ip is True
+            if _valid_ip:
+                ping_ret = os.system(f"ping -n 1 -w 1000 {alfa_device_ip}")
+                logging.debug(f'ping_ret: {ping_ret}')
+                if ping_ret != 1:
+                    _reachable_ip = True
+
+            logging.debug(f"_valid_ip: {_valid_ip} | _reachable_ip: {_reachable_ip}")
+
+            self.main_window.update_gui_ip_infos(valid_ip=_valid_ip, reachable_ip=_reachable_ip)
+            await asyncio.sleep(sleep_time)
+
 
     def run_forever(self):
 
