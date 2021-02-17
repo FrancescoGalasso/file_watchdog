@@ -118,11 +118,14 @@ class WatchdogApplication(QApplication):
         file_watchdog_task = self.__file_watchdog_task(5)
         self.__tasks.append(file_watchdog_task)
 
-        ip_watchdog_task = self.__ip_watchdog_task(5)
+        ip_watchdog_task = self.__ip_watchdog_task(3)
         self.__tasks.append(ip_watchdog_task)
 
     def __close_tasks(self):
         logging.warning('close all tasks')
+
+        tasks = [task for task in asyncio.all_tasks(self.loop) if not task.done()]
+        logging.warning(f'tasks: {tasks}')
 
         for t in self.__runners[:]:
 
@@ -173,9 +176,11 @@ class WatchdogApplication(QApplication):
 
             # check if IP is reachable if _valid_ip is True
             if _valid_ip:
-                ping_ret = os.system(f"ping -n 1 -w 1000 {alfa_device_ip}")
-                logging.debug(f'ping_ret: {ping_ret}')
-                if ping_ret != 1:
+                cmd_ = f"ping -n 1 -w 1000 {alfa_device_ip}"
+                ping_process = await asyncio.create_subprocess_shell(cmd_, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+                status = await ping_process.wait()
+                logging.warning(f'status: {status}')
+                if status == 0:
                     _reachable_ip = True
 
             logging.debug(f"_valid_ip: {_valid_ip} | _reachable_ip: {_reachable_ip}")
