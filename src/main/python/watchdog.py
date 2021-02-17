@@ -52,6 +52,8 @@ class MainWindow(QMainWindow):  # pylint: disable=too-few-public-methods
         self.btn_open_folder_files.clicked.connect(self.__get_folder_path)
         self.btn_save_cfg.clicked.connect(self.__save_cfg)
 
+        self.__load_cfg()
+
 
     def handle_exception(self, err, timestamp, ui_msg=None):  # pylint:  disable=no-self-use
 
@@ -126,6 +128,22 @@ class MainWindow(QMainWindow):  # pylint: disable=too-few-public-methods
 
         except (EmptyArguments, MissingIP, MissingFolderPath) as excp:
             self.handle_exception(excp, formatted_date)
+
+    def __load_cfg(self):
+        if CACHE.get('config'):
+            current_config = CACHE.get('config')
+            for elem in current_config:
+                if 'ip' in elem:
+                    _ip = current_config.get('ip')
+                    self.qline_ip.setText(_ip)
+                elif 'folder_path' in elem:
+                    _folder_path = current_config.get('folder_path')
+                    self.qline_folder_path.setText(_folder_path)
+                elif 'api_endpoint' in elem:
+                    _api_endpoint = current_config.get('api_endpoint')
+                    self.qline_api_endpoint.setText(_api_endpoint)
+                else:
+                    pass
 
 
 class WatchdogApplication(QApplication):
