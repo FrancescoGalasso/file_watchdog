@@ -337,6 +337,19 @@ class WatchdogApplication(QApplication):
                 if r.status_code == 200:
                     alfadriver_success_msg = 'FLINK SUCCESSFULLY SEND TO TINTING'
                     self.main_window.update_gui_msg_board(alfadriver_success_msg)
+
+                    # open CHROME browser showing AlfaDriver dispense page
+                    cmd_ = "taskkill /F /IM chrome.exe /T > nul"
+                    os.system(cmd_)
+                    chrome_cmd = "start chrome -disable-web-security --disable-translate --noerrors --disable-session-crashed-bubble --disable-infobars"
+                    # http://192.168.1.195:8080/dispense_page_by_formula_file/
+                    uri_dispense = 'http://{}:{}/dispense_page_by_formula_file/'.format(ip, ALFA40_SERVER_PORT)
+                    cmd_ = "{} {}".format(chrome_cmd, uri_dispense)
+                    logging.warning('cmd_ {}'.format(cmd_))
+                    os.system(cmd_)
+                    logging.debug('cmd browser: {}'.format(cmd_))
+                    logging.info('uri dispense page: {}'.format(uri_dispense))
+
                 else:
                     alfadriver_success_msg = 'ERROR ON SENDING FLINK TO TINTING'
                     self.main_window.update_gui_msg_board(alfadriver_success_msg)
