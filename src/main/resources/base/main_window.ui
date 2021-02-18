@@ -27,26 +27,26 @@
      <property name="geometry">
       <rect>
        <x>120</x>
-       <y>150</y>
+       <y>145</y>
        <width>81</width>
        <height>51</height>
       </rect>
      </property>
      <property name="text">
-      <string>HOME</string>
+      <string/>
      </property>
     </widget>
     <widget class="QPushButton" name="btn_cfg">
      <property name="geometry">
       <rect>
        <x>540</x>
-       <y>150</y>
+       <y>145</y>
        <width>81</width>
        <height>51</height>
       </rect>
      </property>
      <property name="text">
-      <string>CONFIG</string>
+      <string/>
      </property>
     </widget>
     <widget class="QPlainTextEdit" name="msg_board">
@@ -74,6 +74,9 @@
       <width>801</width>
       <height>391</height>
      </rect>
+    </property>
+    <property name="currentIndex">
+     <number>0</number>
     </property>
     <widget class="QWidget" name="home">
      <widget class="QLabel" name="ip_valid_lbl">
@@ -139,7 +142,7 @@
        <string>FILE WATCHDOG</string>
       </property>
      </widget>
-     <widget class="QLabel" name="img_valid_ip">
+     <widget class="QLabel" name="img_valid_lbl">
       <property name="geometry">
        <rect>
         <x>440</x>
@@ -163,6 +166,19 @@
       </property>
       <property name="text">
        <string>VALID IP</string>
+      </property>
+     </widget>
+     <widget class="QLabel" name="version_lbl">
+      <property name="geometry">
+       <rect>
+        <x>370</x>
+        <y>70</y>
+        <width>91</width>
+        <height>17</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string/>
       </property>
      </widget>
     </widget>
