@@ -20,8 +20,8 @@ import requests
 
 from PyQt5 import uic
 from PyQt5.QtWidgets import QMainWindow, QApplication, QFileDialog
-from PyQt5.QtGui import QPixmap
-from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QPixmap, QIcon
+from PyQt5.QtCore import Qt, QSize
 from qasync import QEventLoop
 
 sys.path.append('.')
@@ -46,18 +46,15 @@ class MainWindow(QMainWindow):  # pylint: disable=too-few-public-methods
         self.ui_path = self.ctx.get_resource('main_window.ui')
         uic.loadUi(self.ui_path, self)
 
-        gray = self.ctx.get_resource('images\\gray.png')
-        pixmap_gray = QPixmap(gray).scaled(30, 30, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-        self.img_reach_lbl.setPixmap(pixmap_gray)
-        self.img_valid_ip.setPixmap(pixmap_gray)
-
         self.btn_home.clicked.connect(self.on_btn_home_clicked)
         self.btn_cfg.clicked.connect(self.on_btn_config_clicked)
         self.btn_open_folder_files.clicked.connect(self.__get_folder_path)
         self.btn_save_cfg.clicked.connect(self.__save_cfg)
 
         self.__load_cfg()
+        self.__init_ui()
 
+        self.setFixedSize(800,600)
 
     def handle_exception(self, err, ui_msg=None):  # pylint:  disable=no-self-use
 
@@ -84,9 +81,9 @@ class MainWindow(QMainWindow):  # pylint: disable=too-few-public-methods
         pixmap_green = QPixmap(green).scaled(30, 30, Qt.KeepAspectRatio, Qt.SmoothTransformation)
 
         if valid_ip is True:
-            self.img_valid_ip.setPixmap(pixmap_green)
+            self.img_valid_lbl.setPixmap(pixmap_green)
         elif valid_ip is False:
-            self.img_valid_ip.setPixmap(pixmap_red)
+            self.img_valid_lbl.setPixmap(pixmap_red)
 
         if reachable_ip is True:
             self.img_reach_lbl.setPixmap(pixmap_green)
@@ -151,6 +148,52 @@ class MainWindow(QMainWindow):  # pylint: disable=too-few-public-methods
                     self.qline_api_endpoint.setText(_api_endpoint)
                 else:
                     pass
+
+    def __init_ui(self):
+
+        file_watchdog_version = self.ctx.build_settings.get('version')
+        self.version_lbl.setText(file_watchdog_version)
+
+        img_map = {
+            'img_reach_lbl': {'size': 30,
+                              'fbs_rel_path': 'images\\gray.png'},
+            'img_valid_lbl': {'size': 30,
+                              'fbs_rel_path': 'images\\gray.png'},
+            'btn_home': {'size': 50,
+                              'fbs_rel_path': 'images\\home.png'},
+            'btn_cfg': {'size': 50,
+                              'fbs_rel_path': 'images\\settings.png'},
+        }
+
+        widgets_to_pixmap = [self.img_reach_lbl, self.img_valid_lbl,
+                            self.btn_home, self.btn_cfg]
+
+        logging.warning(self.img_reach_lbl.objectName())
+
+        for widget in widgets_to_pixmap:
+            widget_name = widget.objectName()
+            widget_img_info = img_map.get(widget_name)
+            image_size = widget_img_info.get('size')
+            image_fbs_rel_path = widget_img_info.get('fbs_rel_path')
+            image = self.ctx.get_resource(image_fbs_rel_path)
+
+            if not 'btn' in widget_name:
+                logging.warning('widget.objectName(): {}'.format(widget.objectName()))
+                pixmap_image = QPixmap(image).scaled(image_size, image_size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                widget.setPixmap(pixmap_image)
+
+            elif 'btn' in widget_name:
+                widget.setFlat(True)                       # https://doc.qt.io/qt-5/qpushbutton.html#flat-prop
+                widget.setAutoFillBackground(True)
+                widget.setIcon(QIcon(image))
+                widget.setIconSize(QSize(image_size, image_size))
+                widget.setStyleSheet(
+                    '''
+                    QPushButton::pressed {
+                        border:  none;
+                    }
+                    '''
+                )
 
 
 class WatchdogApplication(QApplication):    # pylint: disable=too-many-instance-attributes
