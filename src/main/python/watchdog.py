@@ -27,12 +27,15 @@ from qasync import QEventLoop
 sys.path.append('.')
 from file_watchdog_exceptions import (MissingIP,
                                       MissingFolderPath,
-                                      EmptyArguments)
+                                      EmptyArguments,
+                                      MultipleFlagActivated)
 sys.path.remove('.')
 
 
 WATCHDOG_CFG_FILE_NAME = 'watchdog.cfg'
 CACHE = {}
+ALFA40_SERVER_PORT = 8080
+ALFA40_API_PREFIX = 'apiV1'
 
 class MainWindow(QMainWindow):  # pylint: disable=too-few-public-methods
     """ Main Window """
@@ -163,6 +166,8 @@ class WatchdogApplication(QApplication):
         self.__config = self.__get_config(fbs_ctx)
         self.__async_qt_event_loop = self.__init_async_event_loop()
         self.__init_tasks()
+        self.__ip_reachable = False
+        self.__ip_valid = False
 
         # Instantiating MainWindow passed as 'main_windows_class'
         self.main_window = main_window_class(fbs_ctx)
@@ -183,7 +188,9 @@ class WatchdogApplication(QApplication):
                 data = {
                     "ip": "",
                     "folder_path": "",
-                    "api_endpoint": ""
+                    "api_endpoint": "",
+                    "alfadriver": 0,
+                    "cr": 0,
                 }
                 json.dump(data, config_file, indent=4)
 
@@ -203,11 +210,10 @@ class WatchdogApplication(QApplication):
 
     def __init_tasks(self):
 
-        # self.__tasks = [self.__create_inner_loop_task()]
-        file_watchdog_task = self.__file_watchdog_task(5)
+        file_watchdog_task = self.__file_watchdog_task(4)
         self.__tasks.append(file_watchdog_task)
 
-        ip_watchdog_task = self.__ip_watchdog_task(3)
+        ip_watchdog_task = self.__ip_watchdog_task(2)
         self.__tasks.append(ip_watchdog_task)
 
     def __close_tasks(self):
@@ -230,54 +236,116 @@ class WatchdogApplication(QApplication):
 
         self.__runners = []
 
-    async def __create_inner_loop_task(self):
-        try:
-
-            self.processEvents()  # gui events
-            await asyncio.sleep(0.05)
-
-        except asyncio.CancelledError:
-            pass
-        except Exception as e:  # pylint: disable=broad-except
-            # self.handle_exception(e)
-            logging.critical(e)
-
     async def __file_watchdog_task(self, sleep_time=5):
 
         watchdog_folder_path = self.__config.get('folder_path')
 
         while True:
 
-            # for (dirpath, dirnames, filenames) in os.walk(watchdog_folder_path):
-            #     tmp_lista += [os.path.join(dirpath, file) for file in filenames if '.bak' not in file]
+            logging.warning('__file_watchdog_task')
+            tmp_lista = []
+            for (dirpath, dirnames, filenames) in os.walk(watchdog_folder_path):
+                tmp_lista += [os.path.join(dirpath, file) for file in filenames if '.bak' not in file]
+
+            logging.warning(f'tmp_lista: {tmp_lista}')
+            if tmp_lista:
+                current_file = tmp_lista[0]
+                current_file_bak = ''.join([current_file, '.bak'])
+
+                logging.warning(f'current_file {current_file}')
+                logging.warning(f'current_file_bak {current_file_bak}')
+                self.upload_to_machine(current_file)
+
+                if os.path.exists(current_file_bak):
+                    os.remove(current_file_bak)
+                os.rename(current_file, current_file_bak)
 
             await asyncio.sleep(sleep_time)
 
     async def __ip_watchdog_task(self, sleep_time=5):
-        _valid_ip = False
-        _reachable_ip = False
 
         while True:
             alfa_device_ip = self.__config.get('ip')
 
-            # check if IP has a valid syntax
-            regex = "^((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\\.){3}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$"
-            if re.search(regex, alfa_device_ip):
-                _valid_ip = True
+            self.__ip_valid = self.ip_validator(alfa_device_ip)
 
             # check if IP is reachable if _valid_ip is True
-            if _valid_ip:
+            if self.__ip_valid:
                 cmd_ = f"ping -n 1 -w 1000 {alfa_device_ip}"
                 ping_process = await asyncio.create_subprocess_shell(cmd_, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
                 status = await ping_process.wait()
                 logging.debug(f'status: {status}')
                 if status == 0:
-                    _reachable_ip = True
+                    self.__ip_reachable = True
 
-            logging.debug(f"_valid_ip: {_valid_ip} | _reachable_ip: {_reachable_ip}")
+            logging.debug(f"self.__ip_valid: {self.__ip_valid} | self.__ip_reachable: {self.__ip_reachable}")
 
-            self.main_window.update_gui_ip_infos(valid_ip=_valid_ip, reachable_ip=_reachable_ip)
+            self.main_window.update_gui_ip_infos(valid_ip=self.__ip_valid, reachable_ip=self.__ip_reachable)
             await asyncio.sleep(sleep_time)
+
+    def upload_to_machine(self, current_file):
+        # logging.warning(f' >>> current_file: {current_file}')
+
+        device_ip = self.__config.get('ip')
+        flag_alfadriver = self.__config.get('alfadriver')
+        flag_cr = self.__config.get('cr')
+        api_endpoint = self.__config.get('api_endpoint')
+
+        # logging.debug(f'{device_ip} - flag_alfadriver {flag_alfadriver} - flag_cr {flag_cr}')
+
+        try:
+
+            if self.__ip_valid and self.__ip_reachable:
+                if flag_alfadriver and flag_cr:
+                    raise MultipleFlagActivated('PLEASE CHECK CONFIG FILE. DETECTED MULTIPLE FLAG ACTIVATED')
+
+                if flag_alfadriver and not flag_cr:
+                    self.__alfadriver_upload_formula_file(device_ip, current_file)
+                elif not flag_alfadriver and flag_cr:
+                    pass
+
+                
+        except MultipleFlagActivated as excp:
+            # logging.critical(excp.message)
+            self.main_window.handle_exception(excp)
+
+
+
+    def ip_validator(self, ip_to_validate):
+        # check if IP has a valid syntax
+        flag_valid_ip = False
+        regex = "^((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\\.){3}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$"
+        if re.search(regex, ip_to_validate):
+            flag_valid_ip = True
+
+        return flag_valid_ip
+
+    def __alfadriver_upload_formula_file(self, ip, path_formula_file):
+
+        uri_upload = "http://{}:{}/{}/{}".format(ip, ALFA40_SERVER_PORT, ALFA40_API_PREFIX, 'ad_hoc')
+
+        with open(path_formula_file, 'r') as formula_file:
+            lines = [line for line in formula_file]
+            params = {'lines': lines}
+            data = {'action': 'upload_file', 'params': params}
+            logging.debug('params: {} | data API ad_hoc: {}'.format(params, data))
+            try:
+                r = requests.post(uri_upload, headers={'content-type': 'application/json'}, data=json.dumps(data), timeout=3)
+                logging.warning("POST uri_upload:{}, data:{}, r.status_code:{}, r.reason:{}".format(
+                                uri_upload, data, r.status_code, r.reason))
+
+                if r.status_code == 200:
+                    alfadriver_success_msg = 'FLINK SUCCESSFULLY SEND TO TINTING'
+                    self.main_window.update_gui_msg_board(alfadriver_success_msg)
+                else:
+                    alfadriver_success_msg = 'ERROR ON SENDING FLINK TO TINTING'
+                    self.main_window.update_gui_msg_board(alfadriver_success_msg)
+
+            except requests.exceptions.RequestException as e:
+                # print(e)
+                result['error'] = True
+                result['data'] = 'Dispenser not reachable ..'
+                logging.critical(e)
 
     def run_forever(self):
 

@@ -27,3 +27,6 @@ class MissingFolderPath(FileWatchdogBaseException, ValueError):
 
 class EmptyArguments(FileWatchdogBaseException):
     """ Empty IP and FOLDER arguments are passed"""
+
+class MultipleFlagActivated(FileWatchdogBaseException):
+	""" Retrieved both alfadriver and cr flag from config file"""
