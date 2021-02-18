@@ -20,7 +20,7 @@ import requests
 
 from PyQt5 import uic
 from PyQt5.QtWidgets import QMainWindow, QApplication, QFileDialog
-from PyQt5.QtGui import QIcon, QPixmap
+from PyQt5.QtGui import QPixmap
 from PyQt5.QtCore import Qt
 from qasync import QEventLoop
 
@@ -104,14 +104,14 @@ class MainWindow(QMainWindow):  # pylint: disable=too-few-public-methods
 
     def __save_cfg(self):
         folder_pth = self.qline_folder_path.text()
-        ip = self.qline_ip.text()
+        ip_tinting = self.qline_ip.text()
 
         try:
 
-            if ip.rstrip() == "" and folder_pth == "" :
+            if ip_tinting.rstrip() == "" and folder_pth == "" :
                 raise EmptyArguments('PLEASE FILL EMPTY IP FIELD AND SELECT A FOLDER')
 
-            elif ip.rstrip() == "":
+            elif ip_tinting.rstrip() == "":
                 raise MissingIP('PLEASE FILL EMPTY IP FIELD')
 
             elif folder_pth == "":
@@ -124,7 +124,7 @@ class MainWindow(QMainWindow):  # pylint: disable=too-few-public-methods
                     with open(self.ctx.get_resource(WATCHDOG_CFG_FILE_NAME), 'w') as f_alias:
                         if CACHE.get('config'):
                             old_config = CACHE.get('config')
-                            old_config.update({'ip': ip})
+                            old_config.update({'ip': ip_tinting})
                             old_config.update({'folder_path': folder_pth})
                         json.dump(old_config, f_alias, indent=2)
                         save_msg = 'NEW CONFIG SAVED'
@@ -153,7 +153,7 @@ class MainWindow(QMainWindow):  # pylint: disable=too-few-public-methods
                     pass
 
 
-class WatchdogApplication(QApplication):
+class WatchdogApplication(QApplication):    # pylint: disable=too-many-instance-attributes
     """ Watchdog Application """
 
     def __init__(self, fbs_ctx, main_window_class, *args, **kwargs):
@@ -289,7 +289,7 @@ class WatchdogApplication(QApplication):
         device_ip = self.__config.get('ip')
         flag_alfadriver = self.__config.get('alfadriver')
         flag_cr = self.__config.get('cr')
-        api_endpoint = self.__config.get('api_endpoint')
+        # api_endpoint = self.__config.get('api_endpoint')
 
         # logging.debug(f'{device_ip} - flag_alfadriver {flag_alfadriver} - flag_cr {flag_cr}')
 
@@ -304,14 +304,11 @@ class WatchdogApplication(QApplication):
                 elif not flag_alfadriver and flag_cr:
                     pass
 
-                
         except MultipleFlagActivated as excp:
             # logging.critical(excp.message)
             self.main_window.handle_exception(excp)
 
-
-
-    def ip_validator(self, ip_to_validate):
+    def ip_validator(self, ip_to_validate):     # pylint: disable=no-self-use
         # check if IP has a valid syntax
         flag_valid_ip = False
         regex = "^((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\\.){3}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$"
@@ -325,7 +322,7 @@ class WatchdogApplication(QApplication):
         uri_upload = "http://{}:{}/{}/{}".format(ip, ALFA40_SERVER_PORT, ALFA40_API_PREFIX, 'ad_hoc')
 
         with open(path_formula_file, 'r') as formula_file:
-            lines = [line for line in formula_file]
+            lines = [line for line in formula_file]     # pylint: disable=unnecessary-comprehension
             params = {'lines': lines}
             data = {'action': 'upload_file', 'params': params}
             logging.debug('params: {} | data API ad_hoc: {}'.format(params, data))
@@ -342,7 +339,6 @@ class WatchdogApplication(QApplication):
                     cmd_ = "taskkill /F /IM chrome.exe /T > nul"
                     os.system(cmd_)
                     chrome_cmd = "start chrome -disable-web-security --disable-translate --noerrors --disable-session-crashed-bubble --disable-infobars"
-                    # http://192.168.1.195:8080/dispense_page_by_formula_file/
                     uri_dispense = 'http://{}:{}/dispense_page_by_formula_file/'.format(ip, ALFA40_SERVER_PORT)
                     cmd_ = "{} {}".format(chrome_cmd, uri_dispense)
                     logging.warning('cmd_ {}'.format(cmd_))
@@ -355,9 +351,6 @@ class WatchdogApplication(QApplication):
                     self.main_window.update_gui_msg_board(alfadriver_success_msg)
 
             except requests.exceptions.RequestException as e:
-                # print(e)
-                result['error'] = True
-                result['data'] = 'Dispenser not reachable ..'
                 logging.critical(e)
 
     def run_forever(self):
